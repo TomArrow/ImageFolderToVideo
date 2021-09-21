@@ -17,6 +17,9 @@ namespace ImageFolderToVideoLosslessMJPEG
         {
             public AviWriter writer;
             public IAviVideoStream stream;
+            public StreamWriter statsCSV;
+            public StreamWriter timecodes;
+            public StreamWriter deleteFilesScript;
         }
 
         struct ImageWrapper
@@ -159,6 +162,18 @@ namespace ImageFolderToVideoLosslessMJPEG
                     wsp.stream.Width = image.Width;
                     wsp.stream.Height = image.Height;
                     wsp.stream.Codec = KnownFourCCs.Codecs.MotionJpeg;
+
+                    wsp.statsCSV = new StreamWriter(GetUnusedFilename(prefix + "-" + resolutionKey + ".avi.stats.csv"));
+                    wsp.timecodes = new StreamWriter(GetUnusedFilename(prefix + "-" + resolutionKey + ".avi.timecodes.txt"));
+                    wsp.deleteFilesScript = new StreamWriter(GetUnusedFilename(prefix + "-" + resolutionKey + ".avi.deleteOriginals.sh"));
+
+                    wsp.statsCSV.WriteLine("frameNumber;originalFilename;timestamp;absoluteFilename");
+                    wsp.timecodes.WriteLine("# timecode format v2");
+                    wsp.deleteFilesScript.WriteLine("#!/bin/bash");
+                    wsp.deleteFilesScript.WriteLine("echo \"Delete original files? Press any key, twice, to continue.\"");
+                    wsp.deleteFilesScript.WriteLine("read -n1 -r");
+                    wsp.deleteFilesScript.WriteLine("read -n1 -r");
+
                     writers.Add(resolutionKey, wsp);
                 }
 
@@ -168,11 +183,27 @@ namespace ImageFolderToVideoLosslessMJPEG
                     0, // starting index in the array
                     image.imageData.Length); // length of the data
 
+                long? timestampParseTry = null;
+                string possibleTimeStamp = Path.GetFileNameWithoutExtension(image.filename);
+                long tmp;
+                if(long.TryParse(possibleTimeStamp,out tmp))
+                {
+                    timestampParseTry = tmp;
+                }
+
+                wasp.deleteFilesScript.WriteLine("rm \""+ image.filename + "\"");
+                wasp.statsCSV.WriteLine((wasp.stream.FramesWritten-1).ToString()+";"+ Path.GetFileName(image.filename) + ";" + timestampParseTry.ToString()+";"+ image.filename);
+                wasp.timecodes.WriteLine(timestampParseTry.ToString()+".00");
+
             });
 
             foreach (WriterStreamPair writer in writers.Values)
             {
                 writer.writer.Close();
+                writer.statsCSV.Dispose();
+                writer.timecodes.Dispose();
+                writer.deleteFilesScript.WriteLine("read -n1 -r");
+                writer.deleteFilesScript.Dispose();
             }
 
             /*
