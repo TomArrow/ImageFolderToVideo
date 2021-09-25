@@ -1,0 +1,3 @@
+[submodule "ext/SharpAvi"]
+	path = ext/SharpAvi
+	url = https://github.com/TomArrow/SharpAvi

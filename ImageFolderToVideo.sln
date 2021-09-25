@@ -5,7 +5,9 @@ VisualStudioVersion = 16.0.31205.134
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageFolderToVideo", "ImageFolderToVideo\ImageFolderToVideo.csproj", "{4327E5BD-91B8-458C-B1AE-BEDBA274BC74}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageFolderToVideoLosslessMJPEG", "ImageFolderToVideoLosslessMJPEG\ImageFolderToVideoLosslessMJPEG.csproj", "{83A25C02-786E-495F-9C90-8336D1E75627}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ImageFolderToVideoLosslessMJPEG", "ImageFolderToVideoLosslessMJPEG\ImageFolderToVideoLosslessMJPEG.csproj", "{83A25C02-786E-495F-9C90-8336D1E75627}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharpAvi", "ext\SharpAvi\SharpAvi\SharpAvi.csproj", "{07B83677-E9B8-4166-A383-CF3B3D393FBD}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -31,6 +33,14 @@ Global
 		{83A25C02-786E-495F-9C90-8336D1E75627}.Release|Any CPU.Build.0 = Release|Any CPU
 		{83A25C02-786E-495F-9C90-8336D1E75627}.Release|x64.ActiveCfg = Release|Any CPU
 		{83A25C02-786E-495F-9C90-8336D1E75627}.Release|x64.Build.0 = Release|Any CPU
+		{07B83677-E9B8-4166-A383-CF3B3D393FBD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{07B83677-E9B8-4166-A383-CF3B3D393FBD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{07B83677-E9B8-4166-A383-CF3B3D393FBD}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{07B83677-E9B8-4166-A383-CF3B3D393FBD}.Debug|x64.Build.0 = Debug|Any CPU
+		{07B83677-E9B8-4166-A383-CF3B3D393FBD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{07B83677-E9B8-4166-A383-CF3B3D393FBD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{07B83677-E9B8-4166-A383-CF3B3D393FBD}.Release|x64.ActiveCfg = Release|Any CPU
+		{07B83677-E9B8-4166-A383-CF3B3D393FBD}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

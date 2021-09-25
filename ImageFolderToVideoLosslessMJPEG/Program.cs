@@ -7,6 +7,8 @@ using System.Drawing.Imaging;
 using System.IO;
 using System.Numerics;
 using ParallelAssemblyLineNET;
+using System.Linq;
+using NaturalSort.Extension;
 
 namespace ImageFolderToVideoLosslessMJPEG
 {
@@ -25,6 +27,7 @@ namespace ImageFolderToVideoLosslessMJPEG
         struct ImageWrapper
         {
             public string filename;
+            public string filenameWithoutPath;
             public bool IsValid;
             public int Width;
             public int Height;
@@ -52,7 +55,21 @@ namespace ImageFolderToVideoLosslessMJPEG
 
         public static void doFolder(string folder,string prefix="output")
         {
-            string[] files = Directory.GetFiles(folder);
+            if(folder[folder.Length-1] != '\\' && folder[folder.Length - 1] != '/')
+            {
+                folder += "\\";
+            }
+            folder = Path.GetDirectoryName(folder);
+
+            Console.WriteLine("Reading folder "+folder+" and sorting results (this can take a while...)");
+            string[] files = Directory.GetFiles(folder).Select(Path.GetFileName).OrderBy(x => x, StringComparison.OrdinalIgnoreCase.WithNaturalSort()).ToArray();
+
+            
+
+            //File.WriteAllLines(prefix+"ordered.txt",files);
+            //return;
+
+            Console.WriteLine("Done. Now starting up the writing.");
 
             Dictionary<string, WriterStreamPair> writers = new Dictionary<string, WriterStreamPair>();
 
@@ -74,6 +91,7 @@ namespace ImageFolderToVideoLosslessMJPEG
             //bool readSuccessful = false;
             //int index = 0;
 
+            int totalCount = files.Length;
 
 
             ParallelAssemblyLine.Run<ImageWrapper, ImageWrapper>(
@@ -89,7 +107,7 @@ namespace ImageFolderToVideoLosslessMJPEG
                         {
                             return new ImageWrapper { imageData = null, filename = null };
                         }
-                        return new ImageWrapper { imageData = File.ReadAllBytes(files[index]), filename = files[index] };
+                        return new ImageWrapper { imageData = File.ReadAllBytes(folder + Path.DirectorySeparatorChar + files[index]), filename = folder+Path.DirectorySeparatorChar+ files[index], filenameWithoutPath=files[index] };
                     }
                     else
                     {
@@ -122,12 +140,12 @@ namespace ImageFolderToVideoLosslessMJPEG
 
                     if (!readSuccessful)
                     {
-                        Console.WriteLine("File " + input.filename + " could not be read.");
+                        Console.WriteLine((1+index).ToString()+"/"+ totalCount.ToString()+": "+"File " + input.filenameWithoutPath + " could not be read.");
                         input.IsValid = false;
                     }
                     else
                     {
-                        Console.WriteLine("File " + input.filename + " read.");
+                        Console.WriteLine((1 + index).ToString() + "/" + totalCount.ToString() + ": " + "File " + input.filenameWithoutPath + " read.");
                         input.IsValid = true;
                     }
 
@@ -156,7 +174,8 @@ namespace ImageFolderToVideoLosslessMJPEG
                         // Emitting AVI v1 index in addition to OpenDML index (AVI v2)
                         // improves compatibility with some software, including 
                         // standard Windows programs like Media Player and File Explorer
-                        EmitIndex1 = true
+                        EmitIndex1 = true,
+                        MaxSuperIndexEntries = 512
                     };
                     wsp.stream = wsp.writer.AddVideoStream();
                     wsp.stream.Width = image.Width;
