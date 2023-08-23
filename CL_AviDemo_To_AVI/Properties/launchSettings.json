@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "CL_AviDemo_To_AVI": {
+      "commandName": "Project",
+      "commandLineArgs": "\"R:\\screenshots\" 500 24 tga \"C:\\tmp\\avidemo\""
+    }
+  }
+}
