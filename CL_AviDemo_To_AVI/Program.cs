@@ -400,7 +400,7 @@ namespace CL_AviDemo_To_AVI
                             {
                                 writer = new AviWriter(GetUnusedFilename(Path.Combine(outputFolder,"cl_avidemo.avi")))
                                 {
-                                    FramesPerSecond = 30,
+                                    FramesPerSecond = outputFPS,
                                     // Emitting AVI v1 index in addition to OpenDML index (AVI v2)
                                     // improves compatibility with some software, including 
                                     // standard Windows programs like Media Player and File Explorer
