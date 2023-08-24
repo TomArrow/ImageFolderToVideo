@@ -612,18 +612,20 @@ namespace CL_AviDemo_To_AVI
 
                                         for (int i = 0; i < outputImage.imageData.Length; i += pixelOffset)
                                         {
-                                            color.X = outputImageFloatDataPtr[i];
+                                            // Reversed because BGR
+                                            color.Z = outputImageFloatDataPtr[i];
                                             color.Y = outputImageFloatDataPtr[i + 1];
-                                            color.Z = outputImageFloatDataPtr[i + 2];
+                                            color.X = outputImageFloatDataPtr[i + 2];
                                             //color *= 0.01f/divisionFactor;
                                             //color *= inverseDivisionFactor;
                                             //color = Vector3.Transform(color, RGBtoXYZMatrix);
                                             //color = Vector3.Transform(color, XYZtoRec2020Matrix);
                                             color = Vector3.Transform(color, finalMatrix);
 
-                                            outputImageByteDataPtr[i] = (byte)Math.Clamp(pq(color.X) * 255f, 0.0f, 255.0f);
+                                            // Reversed because BGR
+                                            outputImageByteDataPtr[i + 2] = (byte)Math.Clamp(pq(color.X) * 255f, 0.0f, 255.0f);
                                             outputImageByteDataPtr[i + 1] = (byte)Math.Clamp(pq(color.Y) * 255f, 0.0f, 255.0f);
-                                            outputImageByteDataPtr[i + 2] = (byte)Math.Clamp(pq(color.Z) * 255f, 0.0f, 255.0f);
+                                            outputImageByteDataPtr[i] = (byte)Math.Clamp(pq(color.Z) * 255f, 0.0f, 255.0f);
                                         }
                                     }
                                 }

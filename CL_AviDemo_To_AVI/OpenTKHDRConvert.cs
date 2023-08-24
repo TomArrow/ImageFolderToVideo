@@ -103,9 +103,10 @@ namespace CL_AviDemo_To_AVI
 	                    const float c2 = 2413.0f / 128.0f;
 	                    const float c3 = 2392.0f / 128.0f;                        
 
-                        float v1 = 0.01f*input[gid*pixelOffset]/(float)divideCount;
+                        // Reverse order because BGR
+                        float v3 = 0.01f*input[gid*pixelOffset]/(float)divideCount;
                         float v2 = 0.01f*input[gid*pixelOffset+1]/(float)divideCount;
-                        float v3 = 0.01f*input[gid*pixelOffset+2]/(float)divideCount;
+                        float v1 = 0.01f*input[gid*pixelOffset+2]/(float)divideCount;
 
                         float t1 = v1 * 0.627441372057979+ v2 *0.329297459521910 + v3 * 0.043351458394495;
                         float t2 = v1 * 0.069027617147078+ v2 *0.919580666887028 + v3 * 0.011361422575401;
@@ -120,13 +121,14 @@ namespace CL_AviDemo_To_AVI
 	                    const vec3 charMult = vec3(255.0f,255.0f,255.0f);
 	                    const vec3 castAdd = vec3(0.5f,0.5f,0.5f);*/
 
-
+        
                         //output[gid*pixelOffset] = 255.0f*input[gid*pixelOffset]/(float)divideCount;
                         //output[gid*pixelOffset+1] = 255.0f*input[gid*pixelOffset+1]/(float)divideCount;
                         //output[gid*pixelOffset+2] = 255.0f*input[gid*pixelOffset+2]/(float)divideCount;
-                        output[gid*pixelOffset] = 255.0f*t1;
+                        // Reverse order because BGR
+                        output[gid*pixelOffset] = 255.0f*t3;
                         output[gid*pixelOffset+1] = 255.0f*t2;
-                        output[gid*pixelOffset+2] = 255.0f*t3;
+                        output[gid*pixelOffset+2] = 255.0f*t1;
                     }
                 ";
 
