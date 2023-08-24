@@ -16,11 +16,27 @@ using System.Threading;
 using Pfim;
 using System.Runtime.InteropServices;
 using ImageFormat = Pfim.ImageFormat;
+using OpenTK.Compute.OpenCL;
 
 namespace CL_AviDemo_To_AVI
 {
     class Program
     {
+
+        enum ProcessingType
+        {
+            RAW,
+            LINEARIZE,
+            LINEARIZE_OVERBRIGHTDARK // Recording made with overbrightbits 1 but without R_GammaCorrect
+        }
+        
+        enum OutputTransfer
+        {
+            RAW,
+            HDR,
+            HDR_HW
+        }
+        
 
         struct WriterStreamPair
         {
@@ -51,6 +67,9 @@ namespace CL_AviDemo_To_AVI
         static double fpsRatio = (double)inputFPS / (double)outputFPS;
         static Int64 inputIndex = 0;
         static string outputFolder = ".";
+
+        static ProcessingType processingType = ProcessingType.LINEARIZE;
+        static OutputTransfer outputTransfer = OutputTransfer.RAW;
 
         static AutoResetEvent videoWriterARE = new AutoResetEvent(true);
         static AutoResetEvent newFileARE = new AutoResetEvent(true);
@@ -107,6 +126,92 @@ namespace CL_AviDemo_To_AVI
                 string tmp = args[4].Trim();
                 outputFolder = tmp != "" ? tmp : ".";
                 Console.WriteLine($"Output folder: {extension}");
+            }
+            if (args.Length < 6)
+            {
+
+                Console.Write("Processing type (r=raw,l=linearize,lod=linearize_overbrightdark) (default linearize): ");
+                string tmp = Console.ReadLine().Trim();
+                switch (tmp)
+                {
+                    default:
+                    case "l":
+                    case "linearize":
+                        processingType = ProcessingType.LINEARIZE;
+                        break;
+                    case "lod":
+                    case "linearize_overbrightdark":
+                        processingType = ProcessingType.LINEARIZE_OVERBRIGHTDARK;
+                        break;
+                    case "raw":
+                    case "r":
+                        processingType = ProcessingType.RAW;
+                        break;
+                }
+            }
+            else
+            {
+                string tmp = args[5].Trim();
+                switch (tmp)
+                {
+                    default:
+                    case "l":
+                    case "linearize":
+                        processingType = ProcessingType.LINEARIZE;
+                        break;
+                    case "lod":
+                    case "linearize_overbrightdark":
+                        processingType = ProcessingType.LINEARIZE_OVERBRIGHTDARK;
+                        break;
+                    case "raw":
+                    case "r":
+                        processingType = ProcessingType.RAW;
+                        break;
+                }
+                Console.WriteLine($"Processing type: {processingType}");
+            }
+            if (args.Length < 7)
+            {
+
+                Console.Write("Output transfer (r=raw,h=hdr,hhw=hdr_hw) (default raw): ");
+                string tmp = Console.ReadLine().Trim();
+                switch (tmp)
+                {
+                    default:
+                    case "r":
+                    case "raw":
+                        outputTransfer = OutputTransfer.RAW;
+                        break;
+                    case "h":
+                    case "hdr":
+                        outputTransfer = OutputTransfer.HDR;
+                        break;
+                    case "hhw":
+                    case "hdr_hw":
+                        outputTransfer = OutputTransfer.HDR_HW;
+                        break;
+                }
+            }
+            else
+            {
+                string tmp = args[6].Trim();
+                switch (tmp)
+                {
+                    default:
+                    case "r":
+                    case "raw":
+                        outputTransfer = OutputTransfer.RAW;
+                        break;
+                    case "h":
+                    case "hdr":
+                        outputTransfer = OutputTransfer.HDR;
+                        break;
+                    case "hhw":
+                    case "hdr_hw":
+                        outputTransfer = OutputTransfer.HDR_HW;
+                        break;
+                }
+                Console.WriteLine($"Output transfer: {outputTransfer}");
             }
 
             CancellationTokenSource tokenSource = new CancellationTokenSource();
@@ -304,23 +409,72 @@ namespace CL_AviDemo_To_AVI
             }
             int pixelOffset = img.pixelFormat == PixelFormat.Format32bppArgb ? 4 : 3;
             //lock (outputImage) { 
-            fixed (float* imageDataPtr = outputImage.imageData) { 
-                for (int y= 0; y < outputImage.height; y++)
+
+            
+            fixed (byte* srcDataPtr = img.imageData)
+            fixed (float* imageDataPtr = outputImage.imageData) {
+                switch (processingType)
                 {
-                    lock (outputImage.lineLocks[y]) // So we can do images in parallel, we just lock on to lines. Idk if this is actually performant tho...
-                    {
-                        for(int x = 0; x < outputImage.width; x++)
+                    case ProcessingType.RAW:
+                        for (int y = 0; y < outputImage.height; y++)
                         {
-                            int reverseY = outputImage.height - y -1;
-                            //outputImage.imageData[y * outputImage.stride + x * pixelOffset] += img.imageData[reverseY * outputImage.stride + x * pixelOffset];
-                            //outputImage.imageData[y * outputImage.stride + x * pixelOffset+1] += img.imageData[reverseY * outputImage.stride + x * pixelOffset + 1];
-                            //outputImage.imageData[y * outputImage.stride + x * pixelOffset+2] += img.imageData[reverseY * outputImage.stride + x * pixelOffset + 2];
-                            imageDataPtr[y * outputImage.stride + x * pixelOffset] += img.imageData[reverseY * outputImage.stride + x * pixelOffset];
-                            imageDataPtr[y * outputImage.stride + x * pixelOffset+1] += img.imageData[reverseY * outputImage.stride + x * pixelOffset + 1];
-                            imageDataPtr[y * outputImage.stride + x * pixelOffset+2] += img.imageData[reverseY * outputImage.stride + x * pixelOffset + 2];
+                            lock (outputImage.lineLocks[y]) // So we can do images in parallel, we just lock on to lines. Idk if this is actually performant tho...
+                            {
+                                for (int x = 0; x < outputImage.width; x++)
+                                {
+                                    int reverseY = outputImage.height - y - 1;
+                                    imageDataPtr[y * outputImage.stride + x * pixelOffset] += srcDataPtr[reverseY * outputImage.stride + x * pixelOffset];
+                                    imageDataPtr[y * outputImage.stride + x * pixelOffset + 1] += srcDataPtr[reverseY * outputImage.stride + x * pixelOffset + 1];
+                                    imageDataPtr[y * outputImage.stride + x * pixelOffset + 2] += srcDataPtr[reverseY * outputImage.stride + x * pixelOffset + 2];
+                                }
+                            }
                         }
-                    }
+                        break;
+                    default:
+                    case ProcessingType.LINEARIZE:
+                        for (int y = 0; y < outputImage.height; y++)
+                        {
+                            lock (outputImage.lineLocks[y]) // So we can do images in parallel, we just lock on to lines. Idk if this is actually performant tho...
+                            {
+                                for (int x = 0; x < outputImage.width; x++)
+                                {
+                                    int reverseY = outputImage.height - y - 1;
+                                    imageDataPtr[y * outputImage.stride + x * pixelOffset] += linearizeSRGB(srcDataPtr[reverseY * outputImage.stride + x * pixelOffset]/255f);
+                                    imageDataPtr[y * outputImage.stride + x * pixelOffset + 1] += linearizeSRGB(srcDataPtr[reverseY * outputImage.stride + x * pixelOffset +1] / 255f);
+                                    imageDataPtr[y * outputImage.stride + x * pixelOffset + 2] += linearizeSRGB(srcDataPtr[reverseY * outputImage.stride + x * pixelOffset +2] / 255f);
+                                }
+                            }
+                        }
+                        break;
+                    case ProcessingType.LINEARIZE_OVERBRIGHTDARK:
+                        float finalMultiplier = 2f / 255f;
+                        Vector3 color = new Vector3();
+                        for (int y = 0; y < outputImage.height; y++)
+                        {
+                            lock (outputImage.lineLocks[y]) // So we can do images in parallel, we just lock on to lines. Idk if this is actually performant tho...
+                            {
+                                for (int x = 0; x < outputImage.width; x++)
+                                {
+                                    int reverseY = outputImage.height - y - 1;
+                                    //imageDataPtr[y * outputImage.stride + x * pixelOffset] += linearizeSRGB(img.imageData[reverseY * outputImage.stride + x * pixelOffset]* finalMultiplier);
+                                    //imageDataPtr[y * outputImage.stride + x * pixelOffset + 1] += linearizeSRGB(img.imageData[reverseY * outputImage.stride + x * pixelOffset +1] * finalMultiplier);
+                                    //imageDataPtr[y * outputImage.stride + x * pixelOffset + 2] += linearizeSRGB(img.imageData[reverseY * outputImage.stride + x * pixelOffset +2] * finalMultiplier);
+                                    color.X = srcDataPtr[reverseY * outputImage.stride + x * pixelOffset];
+                                    color.Y = srcDataPtr[reverseY * outputImage.stride + x * pixelOffset +1 ];
+                                    color.Z = srcDataPtr[reverseY * outputImage.stride + x * pixelOffset +2 ];
+                                    color *= finalMultiplier;
+                                    //imageDataPtr[y * outputImage.stride + x * pixelOffset] += (color.X > 0.04045f ? (float)Math.Pow((color.X + 0.055) / 1.055, 2.4) : color.X / 12.92f);
+                                    //imageDataPtr[y * outputImage.stride + x * pixelOffset + 1] += (color.Y > 0.04045f ? (float)Math.Pow((color.Y + 0.055) / 1.055, 2.4) : color.Y / 12.92f);
+                                    //imageDataPtr[y * outputImage.stride + x * pixelOffset + 2] += (color.Z > 0.04045f ? (float)Math.Pow((color.Z + 0.055) / 1.055, 2.4) : color.Z / 12.92f);
+                                    imageDataPtr[y * outputImage.stride + x * pixelOffset] += (color.X > 0.04045f ? (float)Math.Pow((color.X + 0.055) / 1.055, 2.4) : color.X / 12.92f);
+                                    imageDataPtr[y * outputImage.stride + x * pixelOffset + 1] += (color.Y > 0.04045f ? (float)Math.Pow((color.Y + 0.055) / 1.055, 2.4) : color.Y / 12.92f);
+                                    imageDataPtr[y * outputImage.stride + x * pixelOffset + 2] += (color.Z > 0.04045f ? (float)Math.Pow((color.Z + 0.055) / 1.055, 2.4) : color.Z / 12.92f);
+                                }
+                            }
+                        }
+                        break;
                 }
+                
             }
             //}
             lock (outputImage)
@@ -348,10 +502,38 @@ namespace CL_AviDemo_To_AVI
             videoWriterARE.Set();
         }
 
+
+        // HDR Conversion
+        const float m1 = 1305.0f / 8192.0f;
+        const float m2 = 2523.0f / 32.0f;
+        const float c1 = 107.0f / 128.0f;
+        const float c2 = 2413.0f / 128.0f;
+        const float c3 = 2392.0f / 128.0f;
+        static float pq(float input)
+        {
+            return (float)Math.Pow((c1 + c2 * Math.Pow(input, m1)) / (1 + c3 * Math.Pow(input, m1)), m2);
+        }
+        static private Matrix4x4 XYZtoRec2020Matrix = new Matrix4x4(1.7167f, -0.6667f, 0.0176f, 0, -0.3557f, 1.6165f, -0.0428f, 0, -0.2534f, 0.0158f, 0.9421f, 0, 0, 0, 0, 0);
+        static private Matrix4x4 RGBtoXYZMatrix = new Matrix4x4(0.4124f, 0.2126f, 0.0193f, 0, 0.3576f, 0.7152f, 0.1192f, 0, 0.1805f, 0.0722f, 0.9505f, 0, 0, 0, 0, 0);
+        static private Matrix4x4 RGBtoRec2020Matrix = RGBtoXYZMatrix * XYZtoRec2020Matrix;
+        static private Matrix4x4 RGBtoRec2020MatrixCent = RGBtoRec2020Matrix * 0.01f;
+
+
+        
+        private static float linearizeSRGB(float n)
+        {
+            return (n > 0.04045f ? (float)Math.Pow((n + 0.055) / 1.055, 2.4) : n / 12.92f);
+        }
+        private static float delinearizeSRGB(float n)
+        {
+            return n > 0.0031308f ? 1.055f * (float)Math.Pow(n, 1 / 2.4) - 0.055f : 12.92f * n;
+        }
+
+        static bool TKIsInitialized = false;
         static Int64 videoNextOutputIndex = 0;
         static AviWriter writer = null;
         static IAviVideoStream videoStream = null;
-        public static void videoWriter()
+        public unsafe static void videoWriter()
         {
             while (true)
             {
@@ -390,10 +572,139 @@ namespace CL_AviDemo_To_AVI
                         {
                             divisionFactor = Math.Max(1, outputImage.appliedSourceImageCount);
                             byte[] outputImageByteData = new byte[outputImage.imageData.Length];
-                            for (int i = 0; i < outputImage.imageData.Length; i++)
+                            if(outputTransfer == OutputTransfer.HDR)
                             {
-                                outputImageByteData[i] = (byte)Math.Clamp(outputImage.imageData[i]/divisionFactor,0.0f,255.0f);
+                                int pixelOffset = outputImage.pixelFormat == PixelFormat.Format32bppArgb ? 4 : 3;
+
+                                // HDR
+                                if (processingType == ProcessingType.RAW)
+                                {
+                                    /*float inverse255 = 1f / 255f;
+                                    float inverseDivisionFactor = 1f / divisionFactor;
+                                    Matrix4x4 finalMatrix = RGBtoRec2020MatrixCent * inverseDivisionFactor;
+                                    Vector3 color = new Vector3();
+                                    for (int i = 0; i < outputImage.imageData.Length; i += pixelOffset)
+                                    {
+                                        color.X = outputImage.imageData[i];
+                                        color.Y = outputImage.imageData[i + 1];
+                                        color.Z = outputImage.imageData[i + 2];
+                                        color *= inverseDivisionFactor;
+                                        color.X = linearizeSRGB(color.X);
+                                        color.Y = linearizeSRGB(color.Y);
+                                        color.Z = linearizeSRGB(color.Z);
+                                        color = Vector3.Transform(color, finalMatrix);
+
+                                        outputImageByteData[i] = (byte)Math.Clamp(pq(color.X) * 255f, 0.0f, 255.0f);
+                                        outputImageByteData[i + 1] = (byte)Math.Clamp(pq(color.Y) * 255f, 0.0f, 255.0f);
+                                        outputImageByteData[i + 2] = (byte)Math.Clamp(pq(color.Z) * 255f, 0.0f, 255.0f);
+                                    }*/
+                                    throw new Exception("HDR output transfer does not work with raw processing type.");
+                                }
+                                else // Linearized
+                                {
+
+                                    fixed (float* outputImageFloatDataPtr = outputImage.imageData)
+                                    fixed (byte* outputImageByteDataPtr = outputImageByteData)
+                                    {
+                                        float inverseDivisionFactor = 1f / divisionFactor;
+                                        Matrix4x4 finalMatrix = RGBtoRec2020MatrixCent * inverseDivisionFactor;
+                                        Vector3 color = new Vector3();
+
+                                        for (int i = 0; i < outputImage.imageData.Length; i += pixelOffset)
+                                        {
+                                            color.X = outputImageFloatDataPtr[i];
+                                            color.Y = outputImageFloatDataPtr[i + 1];
+                                            color.Z = outputImageFloatDataPtr[i + 2];
+                                            //color *= 0.01f/divisionFactor;
+                                            //color *= inverseDivisionFactor;
+                                            //color = Vector3.Transform(color, RGBtoXYZMatrix);
+                                            //color = Vector3.Transform(color, XYZtoRec2020Matrix);
+                                            color = Vector3.Transform(color, finalMatrix);
+
+                                            outputImageByteDataPtr[i] = (byte)Math.Clamp(pq(color.X) * 255f, 0.0f, 255.0f);
+                                            outputImageByteDataPtr[i + 1] = (byte)Math.Clamp(pq(color.Y) * 255f, 0.0f, 255.0f);
+                                            outputImageByteDataPtr[i + 2] = (byte)Math.Clamp(pq(color.Z) * 255f, 0.0f, 255.0f);
+                                        }
+                                    }
+                                }
+                            } else if(outputTransfer == OutputTransfer.HDR_HW)
+                            {
+                                int pixelOffset = outputImage.pixelFormat == PixelFormat.Format32bppArgb ? 4 : 3;
+
+                                // HDR
+                                if (processingType == ProcessingType.RAW)
+                                {
+                                    /*float inverse255 = 1f / 255f;
+                                    float inverseDivisionFactor = 1f / divisionFactor;
+                                    Matrix4x4 finalMatrix = RGBtoRec2020MatrixCent * inverseDivisionFactor;
+                                    Vector3 color = new Vector3();
+                                    for (int i = 0; i < outputImage.imageData.Length; i += pixelOffset)
+                                    {
+                                        color.X = outputImage.imageData[i];
+                                        color.Y = outputImage.imageData[i + 1];
+                                        color.Z = outputImage.imageData[i + 2];
+                                        color *= inverseDivisionFactor;
+                                        color.X = linearizeSRGB(color.X);
+                                        color.Y = linearizeSRGB(color.Y);
+                                        color.Z = linearizeSRGB(color.Z);
+                                        color = Vector3.Transform(color, finalMatrix);
+
+                                        outputImageByteData[i] = (byte)Math.Clamp(pq(color.X) * 255f, 0.0f, 255.0f);
+                                        outputImageByteData[i + 1] = (byte)Math.Clamp(pq(color.Y) * 255f, 0.0f, 255.0f);
+                                        outputImageByteData[i + 2] = (byte)Math.Clamp(pq(color.Z) * 255f, 0.0f, 255.0f);
+                                    }*/
+                                    throw new Exception("HDR output transfer does not work with raw processing type.");
+                                }
+                                else // Linearized
+                                {
+                                    if (!TKIsInitialized)
+                                    {
+                                        OpenTKHDRConvert.prepareTK(outputImage.imageData.Length, DeviceType.Gpu);
+                                        TKIsInitialized = true;
+                                    }
+                                    outputImageByteData = OpenTKHDRConvert.ConvertToHDR(outputImage.imageData, pixelOffset, (int)Math.Max(1, outputImage.appliedSourceImageCount));
+
+                                    /*
+                                    float inverseDivisionFactor = 1f / divisionFactor;
+                                    Matrix4x4 finalMatrix = RGBtoRec2020MatrixCent * inverseDivisionFactor;
+                                    Vector3 color = new Vector3();
+
+                                    for (int i = 0; i < outputImage.imageData.Length; i+= pixelOffset)
+                                    {
+                                        color.X = outputImageFloatDataPtr[i];
+                                        color.Y = outputImageFloatDataPtr[i+1];
+                                        color.Z = outputImageFloatDataPtr[i+2];
+                                        //color *= 0.01f/divisionFactor;
+                                        //color *= inverseDivisionFactor;
+                                        //color = Vector3.Transform(color, RGBtoXYZMatrix);
+                                        //color = Vector3.Transform(color, XYZtoRec2020Matrix);
+                                        color = Vector3.Transform(color, finalMatrix);
+
+                                        outputImageByteDataPtr[i] = (byte)Math.Clamp(pq(color.X)*255f, 0.0f, 255.0f);
+                                        outputImageByteDataPtr[i+1] = (byte)Math.Clamp(pq(color.Y) * 255f, 0.0f, 255.0f);
+                                        outputImageByteDataPtr[i+2] = (byte)Math.Clamp(pq(color.Z) * 255f, 0.0f, 255.0f);
+                                    }*/
+                                }
+                            } else
+                            {
+                                // RAW
+                                if (processingType == ProcessingType.RAW)
+                                {
+                                    for (int i = 0; i < outputImage.imageData.Length; i++)
+                                    {
+                                        outputImageByteData[i] = (byte)Math.Clamp(outputImage.imageData[i] / divisionFactor, 0.0f, 255.0f);
+                                    }
+                                }
+                                else
+                                {
+                                    float extraMult = processingType == ProcessingType.LINEARIZE_OVERBRIGHTDARK ? 0.5f : 1.0f;
+                                    for (int i = 0; i < outputImage.imageData.Length; i++)
+                                    {
+                                        outputImageByteData[i] = (byte)Math.Clamp(delinearizeSRGB(outputImage.imageData[i] / divisionFactor) * 255f * extraMult, 0.0f, 255.0f);
+                                    }
+                                }
                             }
+                            
                             ByteImage outputByteImg = new ByteImage(outputImageByteData,outputImage.stride,outputImage.width,outputImage.height,outputImage.pixelFormat);
 
                             if(writer == null)

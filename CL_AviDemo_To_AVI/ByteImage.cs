@@ -10,7 +10,7 @@ namespace CL_AviDemo_To_AVI
 {
     class StackedFloatImage
     {
-        public volatile float[] imageData;
+        public float[] imageData;
         public int stride;
         public int width, height;
         public PixelFormat pixelFormat;
